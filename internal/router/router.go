@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,6 +14,13 @@ func NewRouter() *Router {
 
 func (r *Router) Start() error {
 	router := gin.Default()
+
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"*"}
+	config.AllowFiles = true
+	config.AllowHeaders = []string{"*"}
+	config.AllowMethods = []string{"*"}
+	router.Use(cors.New(config))
 
 	router.POST("/slice", SliceFile)
 
