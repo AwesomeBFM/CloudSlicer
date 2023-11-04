@@ -10,7 +10,11 @@ COPY . .
 RUN apt-get update -y && \
     apt-get install -y curl tar bzip2 libgl1-mesa-glx libglu1-mesa libgtk-3-dev libdbus-1-dev
 
-## Install PrusaSlicer
+RUN mkdir -p /app/temp/gcode && \
+    mkdir -p /app/temp/model && \
+    mkdir -p /app/temp/config
+
+# Install PrusaSlicer
 RUN curl -L -o prusa-slicer.tar.bz2 https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.6.1/PrusaSlicer-2.6.1+linux-x64-GTK3-202309060711.tar.bz2 && \
     mkdir -p /usr/local/bin/prusa-slicer && \
     tar -xjvf prusa-slicer.tar.bz2 -C /usr/local/bin/prusa-slicer --strip-components=1 && \
