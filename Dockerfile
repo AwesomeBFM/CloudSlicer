@@ -32,7 +32,6 @@ WORKDIR /app
 
 # Copy the built Go binary from Stage 1 && the presets directory
 COPY --from=builder /app/cloudslicer .
-COPY --from=builder /app/presets/ ./presets/
 
 # Copy PrusaSlicer and its dependencies from Stage 2
 COPY --from=prusa-slicer / /
