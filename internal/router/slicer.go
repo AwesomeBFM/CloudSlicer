@@ -1,17 +1,15 @@
 package router
 
 import (
-	"bufio"
 	"fmt"
+	"github.com/AwesomeBFM/CloudSlicer/internal/slicer"
 	"github.com/gin-gonic/gin"
 	"io"
 	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -22,11 +20,8 @@ func SliceFile(c *gin.Context) {
 		return
 	}
 
-	// Access the inputted material
-	material := c.Request.FormValue("material")
-
 	// Access the uploaded model file
-	file, err := c.FormFile("model") // "model" is the name of the file input field in the form
+	model, err := c.FormFile("model") // "model" is the name of the file input field in the form
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Please include a model file"})
 		return
@@ -34,83 +29,68 @@ func SliceFile(c *gin.Context) {
 
 	// Ensure that the model is an STL, 3MF, or OBJ file (Checking MIME type is useless,
 	// 	so we check the extension instead, not really secure though :\ )
-	extension := extractExtension(file.Filename)
-	extension = strings.ToLower(extension)
-	if extension != "stl" && extension != "3mf" && extension != "obj" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file extension"})
+	modelExt := extractExtension(model.Filename)
+	modelExt = strings.ToLower(modelExt)
+	if modelExt != "stl" && modelExt != "3mf" && modelExt != "obj" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid model file extension"})
 		return
 	}
 
-	// Select the correct config & density
-	var confPath string
-	var density float64
-	switch material {
-	case "pla":
-		density = 1.24
-		confPath = "./presets/pla.ini"
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid material"})
+	// Access the uploaded config file
+	config, err := c.FormFile("config")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please include a config file"})
+		return
+	}
+
+	// Ensure that the config is an INI file
+	configExt := extractExtension(config.Filename)
+	configExt = strings.ToLower(configExt)
+	if configExt != "ini" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid config file extension"})
+		return
 	}
 
 	// Save the model to the temp directory
-	filenameNoExt := genRandomFilename()
-	filename := filenameNoExt + "." + extension
-	err = saveFile(file, "./temp/model/"+filename)
+	saved := genRandomFilename()
+	savedModel := saved + "." + modelExt
+	err = saveFile(model, "./temp/model/"+savedModel)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save model file"})
 		return
 	}
 
-	// Slice the model
-	cmd := exec.Command(
-		"prusa-slicer",
-		"--export-gcode",
-		"--load",
-		confPath,
-		"./temp/model/"+filename, "--output",
-		"./temp/gcode/"+filenameNoExt+".gcode",
-		"--info")
-
-	output, err := cmd.CombinedOutput()
+	// Save the config to the temp directory
+	savedConfig := saved + "." + configExt
+	err = saveFile(config, "./temp/config/"+savedConfig)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not slice the model"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save config file"})
 		return
 	}
-	outputStr := string(output)
 
-	// Get the estimated weight of filament required
-	scanner := bufio.NewScanner(strings.NewReader(outputStr))
-	pattern := "volume = "
-
-	var volume float64
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.Contains(line, pattern) {
-			volumeStr := strings.Split(line, pattern)[1]
-			volumeStr = strings.Split(volumeStr, " ")[0]
-			volume, err = strconv.ParseFloat(volumeStr, 64)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not calculate weight"})
-				return
-			}
-			break
-		}
+	gcode, err := slicer.SliceFile(savedModel, savedConfig)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Could not slice model"})
+		return
 	}
 
-	grams := volume * density * 1000
-	fmt.Printf("Estimated weight: %f grams\n", grams)
+	// Return the GCode file
+	c.File(gcode)
 
-	// Return the gcode file
-	c.File("./temp/gcode/" + filenameNoExt + ".gcode")
+	// Remove the model file
+	err = removeFile("./temp/model/" + savedModel)
+	if err != nil {
+		// Report to the internal error handler
+	}
 
-	// Delete the model from the temp directory
-	err = removeFile("./temp/model/" + filename)
+	// Remove the config file
+	err = removeFile("./temp/config/" + savedConfig)
 	if err != nil {
 		// Report to the internal error handler
 	}
 
 	// Remove the GCode file
-	err = removeFile("./temp/gcode/" + filenameNoExt + ".gcode")
+	err = removeFile(gcode)
 	if err != nil {
 		// Report to the internal error handler
 	}
