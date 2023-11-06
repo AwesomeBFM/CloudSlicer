@@ -22,24 +22,23 @@ RUN apt-get update -y && \
     mkdir -p /usr/local/bin/prusa-slicer && \
     tar -xjvf prusa-slicer.tar.bz2 -C /usr/local/bin/prusa-slicer --strip-components=1 && \
     chmod +x /usr/local/bin/prusa-slicer/bin/prusa-slicer && \
-    rm -rf prusa-slicer.tar.bz2 && \
-    apt-get clean && \
-    rm -f /var/lib/apt/lists/*
+    rm -rf prusa-slicer.tar.bz2
 
-# Set environment variables
-ENV PATH="/usr/local/bin/prusa-slicer/bin:$PATH"
-ENV LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 
 # Stage 3: Create the final image
 FROM debian:bullseye-slim
 
 WORKDIR /app
 
-# Copy the built Go binary from Stage 1
+# Copy the built Go binary from Stage 1 && the presets directory
 COPY --from=builder /app/cloudslicer .
+COPY --from=builder /app/presets/ ./presets/
 
 # Copy PrusaSlicer and its dependencies from Stage 2
 COPY --from=prusa-slicer / /
+
+ENV PATH="/usr/local/bin/prusa-slicer/bin:$PATH"
+ENV LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 
 # Expose the required port
 EXPOSE 8080

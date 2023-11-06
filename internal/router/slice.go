@@ -57,15 +57,7 @@ func SliceFile(c *gin.Context) {
 	filename := filenameNoExt + "." + extension
 	err = saveFile(file, "./temp/model/"+filename)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error :(": err.Error()})
-		return
-	}
-
-	// Make the gcode dir and reserve the filename
-	dir := filepath.Dir("./temp/gcode/" + filenameNoExt + ".gcode")
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		fmt.Println("Error on os.MkdirAll")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save model file"})
 		return
 	}
 
@@ -81,7 +73,7 @@ func SliceFile(c *gin.Context) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not slice the model"})
 		return
 	}
 	outputStr := string(output)
@@ -98,7 +90,7 @@ func SliceFile(c *gin.Context) {
 			volumeStr = strings.Split(volumeStr, " ")[0]
 			volume, err = strconv.ParseFloat(volumeStr, 64)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not calculate weight"})
 				return
 			}
 			break
