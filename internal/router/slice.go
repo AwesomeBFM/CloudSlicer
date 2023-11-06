@@ -18,7 +18,7 @@ import (
 func SliceFile(c *gin.Context) {
 	err := c.Request.ParseMultipartForm(10 << 20) // 10 MB limit (adjust as needed)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse multipart form data"})
 		return
 	}
 
@@ -28,21 +28,14 @@ func SliceFile(c *gin.Context) {
 	// Access the uploaded model file
 	file, err := c.FormFile("model") // "model" is the name of the file input field in the form
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Please include a model file"})
 		return
 	}
 
 	// Ensure that the model is an STL, 3MF, or OBJ file (Checking MIME type is useless,
 	// 	so we check the extension instead, not really secure though :\ )
-	nameParts := strings.Split(file.Filename, ".")
-	if len(nameParts) < 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file extension"})
-		return
-	}
-
-	extension := nameParts[len(nameParts)-1]
+	extension := extractExtension(file.Filename)
 	extension = strings.ToLower(extension)
-
 	if extension != "stl" && extension != "3mf" && extension != "obj" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file extension"})
 		return
@@ -129,6 +122,15 @@ func SliceFile(c *gin.Context) {
 	if err != nil {
 		// Report to the internal error handler
 	}
+}
+
+func extractExtension(filename string) string {
+	for i := len(filename) - 1; i >= 0; i-- {
+		if filename[i] == '.' {
+			return filename[i+1:]
+		}
+	}
+	return ""
 }
 
 func saveFile(file *multipart.FileHeader, path string) error {
